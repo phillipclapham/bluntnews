@@ -1,0 +1,23 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+streamlit = "*"
+pandas = "*"
+requests = "*"
+python-dotenv = "*"
+watchdog = "*"
+python-dateutil = "*"
+textblob = "*"
+nltk = "*"
+beautifulsoup4 = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.13"
+
+[pipenv]
+allow_prereleases = true
