@@ -441,7 +441,7 @@ def display_article(article):
 
 # Page configuration
 st.set_page_config(
-    page_title="News App",
+    page_title="BluntNews",
     page_icon="📰",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -527,6 +527,7 @@ else:
 
 # Date selection
 st.sidebar.markdown("---")
+st.sidebar.subheader("Date Filtering")
 start_date = st.sidebar.date_input(
     "Start Date",
     value=datetime.today() - timedelta(days=7),
@@ -547,6 +548,7 @@ keyword = st.sidebar.text_input("Search Keywords")
 
 # Theme toggle (moved to bottom)
 st.sidebar.markdown("---")
+st.sidebar.subheader("Theme Selection")
 theme = st.sidebar.radio("Theme", ["Light", "Dark"])
 if theme == "Dark":
     st.markdown("""
@@ -561,11 +563,11 @@ if theme == "Dark":
 # Attribution
 st.sidebar.markdown("---")
 st.sidebar.markdown("Powered by [NewsAPI.org](https://newsapi.org)")
+st.sidebar.markdown("Made by [Phillip Clapham](https://github.com/phillipclapham)")
 
 # Main content area
-st.title("📰 News Application")
+st.title("📰 BluntNews")
 st.write("Stay informed with the latest news based on your preferences.")
-
 # Track current parameters
 current_params = {
     'category': category,
