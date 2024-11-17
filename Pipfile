@@ -4,15 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-streamlit = "*"
-pandas = "*"
-requests = "*"
-python-dotenv = "*"
-watchdog = "*"
-python-dateutil = "*"
-textblob = "*"
 nltk = "*"
-beautifulsoup4 = "*"
 
 [dev-packages]
 

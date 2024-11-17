@@ -1,6 +1,5 @@
 import streamlit as st
 import requests
-import pandas as pd
 from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
@@ -9,7 +8,17 @@ from textblob import TextBlob
 from collections import Counter
 import re
 from bs4 import BeautifulSoup
-import time
+import nltk
+from nltk.tokenize import sent_tokenize, word_tokenize
+from nltk.corpus import opinion_lexicon
+
+# Download required NLTK data
+try:
+    nltk.data.find('tokenizers/punkt')
+    nltk.data.find('corpora/opinion_lexicon')
+except LookupError:
+    nltk.download('punkt')
+    nltk.download('opinion_lexicon')
 
 # Load environment variables
 load_dotenv()
@@ -27,6 +36,82 @@ if 'sources' not in st.session_state:
 
 if 'article_cache' not in st.session_state:
     st.session_state.article_cache = {}
+
+def analyze_bias(text):
+    """
+    Analyze text for potential bias using multiple indicators
+    Returns a dictionary containing bias analysis results
+    """
+    if not text:
+        return {
+            "bias_detected": False,
+            "bias_score": 0,
+            "indicators": [],
+            "details": {}
+        }
+
+    # Initialize bias indicators
+    bias_indicators = []
+    details = {}
+
+    # Tokenize text
+    sentences = sent_tokenize(text)
+    words = word_tokenize(text.lower())
+
+    # Load opinion lexicon
+    positive_words = set(opinion_lexicon.positive())
+    negative_words = set(opinion_lexicon.negative())
+
+    # 1. Analyze loaded language
+    emotional_words = [word for word in words if word in positive_words or word in negative_words]
+    emotional_word_ratio = len(emotional_words) / len(words) if words else 0
+    if emotional_word_ratio > 0.1:  # More than 10% emotional words
+        bias_indicators.append("High emotional language")
+        details["emotional_language"] = {
+            "ratio": emotional_word_ratio,
+            "examples": emotional_words[:5]  # Show first 5 examples
+        }
+
+    # 2. Check for qualifying words (indicates potential bias)
+    qualifying_words = ['many', 'some', 'few', 'several', 'numerous', 'rarely', 'often', 'generally', 'usually']
+    qualifying_count = sum(1 for word in words if word in qualifying_words)
+    if qualifying_count > len(sentences) * 0.2:  # More than 20% of sentences contain qualifying words
+        bias_indicators.append("Frequent use of qualifying language")
+        details["qualifying_language"] = {
+            "count": qualifying_count,
+            "examples": [word for word in words if word in qualifying_words][:5]
+        }
+
+    # 3. Check for source attribution
+    source_phrases = ['according to', 'said', 'reported', 'stated', 'claims', 'suggests']
+    source_count = sum(1 for phrase in source_phrases if phrase in text.lower())
+    if source_count < len(sentences) * 0.1:  # Less than 10% of sentences have source attribution
+        bias_indicators.append("Limited source attribution")
+        details["source_attribution"] = {
+            "count": source_count,
+            "total_sentences": len(sentences)
+        }
+
+    # 4. Check for absolute language
+    absolute_words = ['always', 'never', 'all', 'none', 'every', 'only', 'impossible', 'absolutely']
+    absolute_count = sum(1 for word in words if word in absolute_words)
+    if absolute_count > 0:
+        bias_indicators.append("Use of absolute language")
+        details["absolute_language"] = {
+            "count": absolute_count,
+            "examples": [word for word in words if word in absolute_words]
+        }
+
+    # 5. Calculate overall bias score (0-1)
+    indicators_count = len(bias_indicators)
+    bias_score = min(1.0, indicators_count / 4)  # Normalize to 0-1 range
+
+    return {
+        "bias_detected": bool(bias_indicators),
+        "bias_score": bias_score,
+        "indicators": bias_indicators,
+        "details": details
+    }
 
 def fetch_article_content(url):
     """Fetch and extract the main content of an article"""
@@ -275,8 +360,44 @@ def display_article(article):
 
         # Combine title and description for initial analysis
         preview_text = f"{article.get('title', '')} {article.get('description', '')}"
+        analysis_text = full_content if full_content else preview_text
 
-        # Subject identification and targeted sentiment analysis
+        # Bias Analysis
+        bias_results = analyze_bias(analysis_text)
+        if bias_results["bias_detected"]:
+            st.markdown("### Bias Analysis")
+            st.markdown(f"**Bias Score:** {bias_results['bias_score']:.2f}")
+
+            # Display bias indicators with explanations
+            st.markdown("**Detected Bias Indicators:**")
+            for indicator in bias_results["indicators"]:
+                st.markdown(f"- {indicator}")
+
+            # Expandable detailed analysis
+            with st.expander("See detailed bias analysis"):
+                details = bias_results["details"]
+
+                if "emotional_language" in details:
+                    st.markdown("**Emotional Language:**")
+                    st.markdown(f"- Ratio: {details['emotional_language']['ratio']:.2f}")
+                    st.markdown(f"- Examples: {', '.join(details['emotional_language']['examples'])}")
+
+                if "qualifying_language" in details:
+                    st.markdown("**Qualifying Language:**")
+                    st.markdown(f"- Count: {details['qualifying_language']['count']}")
+                    st.markdown(f"- Examples: {', '.join(details['qualifying_language']['examples'])}")
+
+                if "source_attribution" in details:
+                    st.markdown("**Source Attribution:**")
+                    st.markdown(f"- Attribution count: {details['source_attribution']['count']}")
+                    st.markdown(f"- Total sentences: {details['source_attribution']['total_sentences']}")
+
+                if "absolute_language" in details:
+                    st.markdown("**Absolute Language:**")
+                    st.markdown(f"- Count: {details['absolute_language']['count']}")
+                    st.markdown(f"- Examples: {', '.join(details['absolute_language']['examples'])}")
+
+        # Subject and Sentiment Analysis
         main_subject = identify_main_subject(preview_text, full_content)
         if main_subject:
             st.write(f"**Main Subject:** {main_subject}")
